@@ -20,6 +20,7 @@ python3 selftest.py           # GPU·모델 없이 검증 (가짜 엔진, 임시
 | `MPNN_ENV` | `~/miniforge3/envs/proteinmpnn` | `ligandmpnn`(가중치 포함) 이 깔린 conda 환경 — 서열 설계 탭 |
 | `BOLTZ_CACHE` | `~/.boltz` | `boltz2_conf.ckpt`, `boltz1_conf.ckpt`, `boltz2_aff.ckpt`, `mols/` (CCD) |
 | `CUDA_VISIBLE_DEVICES` / `PROTEIN_GPUS` | (전부) | 쓸 GPU 목록. 작업마다 이 중 **여유 메모리가 가장 큰 1장**을 고름 |
+| `GPU_PICK_HOLD_S` | `600` | 고른 GPU 에 작업 크기만큼 걸어 두는 예약 시간(작업이 끝나면 바로 풀림). 예약은 같은 서버의 다른 도구(`gpu_pick.py` 사용)와 같이 봐서, 거의 동시에 시작한 작업이 한 GPU 로 몰리지 않음 |
 | `MAX_RES` | `1500` | 잔기 + 리간드 원자 합 한도 |
 | `MAX_CHAINS` | `10` | 사슬 + 리간드 개수 한도 |
 | `JOB_TIMEOUT` | `3600` | 작업 하나 최대 초 |
@@ -27,6 +28,7 @@ python3 selftest.py           # GPU·모델 없이 검증 (가짜 엔진, 임시
 
 ## 구성
 - `app.py` — HTTP 서버·작업 큐(워커 1개)·입력 검증·결과 파싱(PDB B 인자=pLDDT, `pae_*.npz` 를 표준 라이브러리로 읽음)·LLM 해설·CA 중첩 RMSD
+- `gpu_pick.py` — GPU 고르기(여유 메모리 최대 + 도구 간 공유 예약, stdlib). 다른 도구 저장소와 같은 파일
 - `runner.py` — Boltz 환경에서 실행: 리간드 사전 확인(RDKit) → `boltz predict`(같은 프로세스, `--no_kernels`) → GPU 최대 메모리 기록 → PDB→mmCIF(gemmi)
 - `runner_mpnn.py` — proteinmpnn 환경에서 ProteinMPNN 실행 (가중치는 `ligandmpnn` 패키지에 동봉)
 - `ui.html` — 탭 3개·대기열·진행 로그·3D 뷰어(pLDDT/사슬/이차구조/무지개, 리본·막대·표면, 사슬 켜고 끄기)·잔기별 pLDDT 그래프·PAE 히트맵·리간드 순위표·설계 서열 표·다운로드

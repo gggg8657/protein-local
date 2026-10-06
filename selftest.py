@@ -153,7 +153,7 @@ def main():
     app.boltz_py = app.mpnn_py = lambda: sys.executable
     app.mpnn_ok = lambda: True
     app.engines = lambda: [{"id": "boltz2", "label": "Boltz-2", "ligand": True, "affinity": True}]
-    app.pick_gpu = lambda: {"index": "9", "name": "fake", "free": 1000}
+    app.pick_gpu = lambda need=0: {"index": "9", "name": "fake", "free": 1000}
 
     # ── 서열 검증 ──
     ch, err = app.parse_fasta(">a\nMQIF VKTL\n12 TGK*\n>b desc\nacdefg")

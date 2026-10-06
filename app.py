@@ -29,6 +29,8 @@ import urllib.request
 import zipfile
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+import gpu_pick
+
 ROOT = os.path.dirname(os.path.abspath(__file__))
 WS = os.environ.get("WORKSPACE") or os.path.join(ROOT, "_workspace")  # 포털이 AGENT_DATA/<도구> 로 모아 줌
 LLM_API = os.environ.get("LLM_API", "ollama")
@@ -39,6 +41,8 @@ PORT = int(os.environ.get("PORT", "8781"))
 BOLTZ_ENV = os.path.expanduser(os.environ.get("BOLTZ_ENV", "~/miniforge3/envs/boltz"))
 BOLTZ_CACHE = os.path.expanduser(os.environ.get("BOLTZ_CACHE", "~/.boltz"))
 GPUS = [g.strip() for g in (os.environ.get("PROTEIN_GPUS") or os.environ.get("CUDA_VISIBLE_DEVICES") or "").split(",") if g.strip()]
+if os.environ.get("PROTEIN_GPUS"):
+    os.environ.setdefault("GPU_POOL", os.environ["PROTEIN_GPUS"])  # gpu_pick 도 같은 후보만
 MAX_RES = int(os.environ.get("MAX_RES", "1500"))          # 잔기 + 리간드 원자 합 (H100 에서 ~1500 토큰 ≈ 30GB 안팎)
 MAX_CHAINS = int(os.environ.get("MAX_CHAINS", "10"))
 MAX_SAMPLES = 5
@@ -122,9 +126,19 @@ def gpu_status():
             for a, b, c, d, e in rows if not GPUS or a in GPUS]
 
 
-def pick_gpu():
-    g = sorted(gpu_status(), key=lambda x: -x["free"])
-    return g[0] if g else None
+def need_mb(job):
+    """작업이 GPU 에 잡을 메모리 어림(MiB) — 33토큰 ≈ 3GB, 1500토큰 ≈ 30GB"""
+    return 3000 if job.get("kind") == "design" else 4000 + 20 * int(job.get("tokens") or 0)
+
+
+def pick_gpu(need=0):
+    """여유 메모리가 가장 큰 GPU 1장. 다른 도구(tts·meeting·avatar…)와 같은 예약 장부(gpu_pick.py)를 써서,
+    거의 동시에 고르는 작업이 한 GPU 로 몰리지 않게 need MiB 를 예약한다(작업이 끝나면 release).
+    need 만큼 빈 GPU 가 없으면 예전처럼 가장 넉넉한 것(예약 없이) — 모자라면 작업이 '메모리 부족'으로 끝난다"""
+    g = gpu_pick.pick(need) or gpu_pick.pick(0)
+    if g:
+        g["name"] = next((x["name"] for x in gpu_status() if x["index"] == g["index"]), "GPU")
+    return g
 
 
 # ── 입력 검증 ───────────────────────────────────────────────────────────
@@ -543,7 +557,7 @@ def run_job(jid):
     job = update_job(jid, status="running", started=datetime.datetime.now().isoformat(timespec="seconds"))
     log = open(jdir(jid, "log.txt"), "a", encoding="utf-8", buffering=1)
     env = dict(os.environ, PYTHONUNBUFFERED="1", CUDA_DEVICE_ORDER="PCI_BUS_ID", HF_HUB_OFFLINE="1", TQDM_MININTERVAL="2")
-    g = pick_gpu()
+    g = pick_gpu(need_mb(job))
     if g:
         env["CUDA_VISIBLE_DEVICES"] = g["index"]
         log.write(f"[app] GPU {g['index']} ({g['name']}) 여유 {g['free']} MiB 에서 실행\n")
@@ -585,6 +599,7 @@ def run_job(jid):
         rc = p.wait()
     finally:
         timer.cancel()
+        gpu_pick.release(g)
         with LOCK:
             RUNNING.pop(jid, None)
     elapsed = round(time.time() - t0, 1)
