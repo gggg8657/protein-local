@@ -1,0 +1,30 @@
+protein-local
+=============
+
+Bundled third-party software:
+  3Dmol.js 2.5.5 — static/3Dmol-min.js — Copyright (c) 2014, University of Pittsburgh and contributors
+    BSD 3-Clause License (static/3Dmol.LICENSE.txt, static/3Dmol-min.js.LICENSE.txt)
+    출처: https://github.com/3dmol/3Dmol.js (npm 3dmol@2.5.5). GLmol·Three.js·jQuery 코드 포함 — 각 라이선스는 위 파일에 기재.
+
+Used, not bundled (서버에 따로 설치되어 있어야 함):
+  Boltz (boltz-1 / boltz-2) — MIT License — https://github.com/jwohlwend/boltz
+    모델 가중치(boltz1_conf.ckpt, boltz2_conf.ckpt, boltz2_aff.ckpt)·CCD 사전(mols/)도 MIT 로 배포됨. 이 폴더에는 들어 있지 않음.
+    결합 친화도 해석(affinity_pred_value = log10(IC50), IC50 단위 μM / affinity_probability_binary = 결합체 확률)은
+    Boltz 공식 README 의 "Binding Affinity Prediction" 절을 따름.
+  ProteinMPNN / LigandMPNN — MIT License — https://github.com/dauparas/LigandMPNN
+    이 서버에는 pip 패키지 `ligandmpnn` (가중치 포함) 으로 설치되어 있음 (conda env: proteinmpnn). 이 폴더에는 들어 있지 않음.
+    원 논문: Dauparas et al., "Robust deep learning-based protein sequence design using ProteinMPNN", Science (2022).
+  RDKit (BSD-3-Clause), gemmi (MPL-2.0) — Boltz 환경에 함께 설치되는 의존성 (SMILES 확인, PDB→mmCIF 변환)
+
+예시 서열: Trp-cage TC5b(설계 펩타이드), 사람 유비퀴틴(UniProt P0CG48 의 1–76), 사람 인슐린 A·B 사슬(UniProt P01308),
+  Aequorea victoria GFP(UniProt P42212) — 공개 서열.
+
+예시 리간드: ATP·NAG(CCD 코드), 아스피린·에탄올·갈락토스(공개 SMILES).
+
+Files authored for this package (MIT): app.py, runner.py, runner_mpnn.py, ui.html, selftest.py, setup.sh, README.md
+
+LLM (not bundled): called via an OpenAI-compatible API; default deployment is Ollama (https://github.com/ollama/ollama, MIT)
+  serving Google Gemma (gemma4:31b, https://ai.google.dev/gemma — see Gemma's terms of use).
+
+This package: Copyright (c) 2026 gggg8657 <dongjukim.dev@gmail.com>
+화면 하단·메타데이터의 저작자 표기는 지우거나 바꾸지 마세요.
