@@ -1,9 +1,33 @@
 # protein-local — 단백질 구조 예측 · 결합 친화도 · 서열 설계
 
-> **한 줄 요약** — 아미노산 서열(FASTA)을 붙여 넣으면 Boltz-2 로 3D 구조를 예측해 브라우저에서 바로 보여 주고(pLDDT 색칠·PAE 행렬·사슬별 지표), PDB/mmCIF 로 내려받는 도구입니다.
-> 탭 3개: **구조 예측**, **결합 친화도**(리간드 여러 개 순위 비교), **서열 설계**(ProteinMPNN → 재예측 RMSD 자체 검증).
-> 여러 사슬 → 복합체, 리간드(SMILES·CCD 코드)와 결합 친화도(Boltz-2)까지. 작업은 GPU 1장에서 한 번에 1개씩 줄을 서고, 이력은 WORKSPACE 에 남습니다.
-> 폐쇄망 전제 — **MSA 서버를 부르지 않는 단일 서열 모드**입니다. 3D 뷰어(3Dmol.js)는 동봉, CDN 없음. 로컬 LLM 이 있으면 지표를 근거로 한 '결과 해설'.
+아미노산 서열(FASTA)을 넣으면 로컬 GPU 에서 Boltz-2 로 3D 구조(pLDDT·PAE)·결합 친화도를 예측하고, ProteinMPNN 으로 서열을 설계하는 로컬 웹 도구입니다. 포트 `8781`.
+
+![구조 예측 결과 — ① 3D 뷰어](docs/img/result.png)
+
+## 무엇을 하나
+
+- 탭 3개: **구조 예측**(서열 → 3D 구조, 여러 사슬이면 복합체), **결합 친화도**(리간드 여러 개 순위 비교, Boltz-2), **서열 설계**(ProteinMPNN → 재예측 CA-RMSD 자체 검증).
+- 결과는 3D 뷰어(pLDDT 색칠·사슬 선택), 잔기별 pLDDT 그래프, PAE 행렬, 사슬별 지표로 보여 주고 PDB / mmCIF / 전체 ZIP 으로 내려받습니다.
+- 폐쇄망 전제 — **MSA 서버를 부르지 않는 단일 서열 모드**입니다. 3D 뷰어(3Dmol.js)는 동봉, CDN 없음. 작업은 GPU 1장에서 한 번에 1개씩 줄을 서고, 이력은 WORKSPACE 에 남습니다.
+- 로컬 LLM(포털 기본: Ollama `gemma4:31b`)이 있으면 지표를 근거로 한 '결과 해설'을 씁니다.
+
+## 사용 방법
+
+![입력 화면 — ① 예시 ② FASTA 서열 ③ 실행](docs/img/input.png)
+
+1. **예시** 버튼(①: Trp-cage 20aa, 유비퀴틴 76aa, 인슐린 A+B 사슬, GFP 238aa)을 누르거나 서열을 직접 붙여 넣습니다.
+2. **아미노산 서열**(②)은 FASTA 형식입니다. `>이름` 레코드가 여러 개면 복합체로 함께 예측합니다. 리간드(SMILES·CCD 코드)는 선택입니다.
+3. 엔진(Boltz-2)·샘플 수·모드(빠름 / 표준 / 정밀)를 고르고 **구조 예측 실행**(③)을 누릅니다. 다른 작업이 돌고 있으면 줄을 서고, 진행 로그가 실시간으로 보입니다.
+4. 결과 카드에서 평균 pLDDT·pTM·종합 점수·소요 시간·GPU 최대 메모리를 확인하고, 3D 뷰어(결과 화면 ①)에서 구조를 돌려 봅니다. **PDB 받기 / mmCIF 받기 / 전체 ZIP / PAE 이미지 저장**, 또는 **이 구조로 서열 설계 →** 로 이어 갑니다.
+
+## 예시
+
+포털 경유로 실제 실행한 결과입니다(2026-10-07, 작업 `20261007-064038-4edd`).
+
+- **입력**: Trp-cage TC5b (20aa) `NLYIQWLKDGGPSSGRPPPS` · 엔진 Boltz-2 · 모드 빠름 · 샘플 1 · MSA 없음
+- **출력**: 평균 pLDDT **95.5** · pTM **0.492** · 종합 점수 0.863 · 사슬 1개 · 소요 22초(엔진 18초) · GPU 최대 2.1GB (H100 NVL)
+
+## 설치·실행
 
 ```bash
 bash setup.sh                 # Python → Boltz 환경·가중치 확인 → GPU → LLM 탐색(선택) → selftest → http://localhost:8781
@@ -24,7 +48,7 @@ python3 selftest.py           # GPU·모델 없이 검증 (가짜 엔진, 임시
 | `MAX_RES` | `1500` | 잔기 + 리간드 원자 합 한도 |
 | `MAX_CHAINS` | `10` | 사슬 + 리간드 개수 한도 |
 | `JOB_TIMEOUT` | `3600` | 작업 하나 최대 초 |
-| `LLM_API` / `LLM_BASE_URL` / `LLM_MODEL` | `ollama` / `http://localhost:11434` / `qwen3:8b` | '결과 해설'에만 씀. 없으면 그 버튼만 실패 |
+| `LLM_API` / `LLM_BASE_URL` / `LLM_MODEL` | `ollama` / `http://localhost:11434` / `qwen3:8b` | '결과 해설'에만 씀. 없으면 그 버튼만 실패. 포털로 띄우면 로컬 Ollama(`:11436`)의 `gemma4:31b` 가 넘어옴 |
 
 ## 구성
 - `app.py` — HTTP 서버·작업 큐(워커 1개)·입력 검증·결과 파싱(PDB B 인자=pLDDT, `pae_*.npz` 를 표준 라이브러리로 읽음)·LLM 해설·CA 중첩 RMSD
@@ -108,3 +132,7 @@ Boltz 가 내놓는 두 값의 뜻은 Boltz 공식 README 의 "Binding Affinity 
 - 이 도구는 [agent-page-portal](https://github.com/gggg8657/agent-page-portal) 에 연결해 쓰도록 만들었습니다(단독 실행도 됨).
 
 저작권 표기·전체 목록은 `NOTICE` 를 보세요.
+
+## 라이선스
+
+MIT License — Copyright (c) 2026 DongJu Kim (gggg8657). `LICENSE` 를 보세요.
