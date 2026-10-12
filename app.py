@@ -65,8 +65,9 @@ EXAMPLES = [
 ]
 LOCK = threading.RLock()
 WAKE = threading.Condition(LOCK)
-QUEUE = []           # 대기 중 작업 id (앞이 먼저)
-RUNNING = {}         # id → Popen
+QUEUE = []           # 대기 중 (사용자 폴더, 작업 id) (앞이 먼저) — GPU 줄은 모두가 같이 선다
+RUNNING = {}         # (사용자 폴더, 작업 id) → Popen
+_REQ = threading.local()  # 요청·워커 스레드마다 그 사용자의 작업 폴더 (user_ws 로 정함)
 RUNNER = os.path.join(ROOT, "runner.py")
 RUNNER_MPNN = os.path.join(ROOT, "runner_mpnn.py")
 MPNN_ENV = os.path.expanduser(os.environ.get("MPNN_ENV", "~/miniforge3/envs/proteinmpnn"))
@@ -82,10 +83,28 @@ def read(p):
         return f.read()
 
 
+def user_ws(h):
+    """포털이 넘긴 사용자별 작업 폴더. owner(서버 주인)·헤더 없음(단독 실행) = 예전 WORKSPACE 그대로"""
+    u = (h.headers.get("X-Agent-User") or "owner").strip()
+    if u == "owner":
+        return WS
+    d = os.path.join(WS, "u", re.sub(r"[^A-Za-z0-9_.-]", "_", u)[:64] or "_")
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+def cur_ws():
+    return getattr(_REQ, "ws", WS)
+
+
+def key(jid):
+    return (cur_ws(), jid)
+
+
 def jdir(jid, *p):
     if not re.fullmatch(r"\d{8}-\d{6}-[0-9a-f]{4}", jid or ""):
         raise FileNotFoundError(jid)
-    return os.path.join(WS, "jobs", jid, *p)
+    return os.path.join(cur_ws(), "jobs", jid, *p)
 
 
 # ── 엔진 ────────────────────────────────────────────────────────────────
@@ -412,7 +431,7 @@ def update_job(jid, **kw):
 
 
 def list_jobs(limit=200):
-    d = os.path.join(WS, "jobs")
+    d = os.path.join(cur_ws(), "jobs")
     if not os.path.isdir(d):
         return []
     out = []
@@ -430,7 +449,7 @@ def list_jobs(limit=200):
 
 def position(jid):
     with LOCK:
-        return QUEUE.index(jid) + 1 if jid in QUEUE else 0
+        return QUEUE.index(key(jid)) + 1 if key(jid) in QUEUE else 0
 
 
 def new_id():
@@ -447,7 +466,7 @@ def enqueue(job, params, files):
         json.dump(params, f, ensure_ascii=False)
     with LOCK:
         save_job(job)
-        QUEUE.append(job["id"])
+        QUEUE.append(key(job["id"]))
         WAKE.notify_all()
     return job
 
@@ -517,10 +536,10 @@ def submit_design(req):
 
 def cancel(jid):
     with LOCK:
-        if jid in QUEUE:
-            QUEUE.remove(jid)
+        if key(jid) in QUEUE:
+            QUEUE.remove(key(jid))
             return update_job(jid, status="canceled", error="사용자가 취소함")
-        p = RUNNING.get(jid)
+        p = RUNNING.get(key(jid))
     if p:
         update_job(jid, cancel=True)
         kill(p)
@@ -541,10 +560,10 @@ def kill(p):
 
 def delete_job(jid):
     with LOCK:
-        if jid in RUNNING:
+        if key(jid) in RUNNING:
             raise ValueError("실행 중인 작업은 먼저 취소하세요")
-        if jid in QUEUE:
-            QUEUE.remove(jid)
+        if key(jid) in QUEUE:
+            QUEUE.remove(key(jid))
     shutil.rmtree(jdir(jid), ignore_errors=True)
 
 
@@ -574,8 +593,9 @@ def run_job(jid):
     t0 = time.time()
     p = subprocess.Popen(cmd, cwd=jdir(jid), env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, start_new_session=True)
     with LOCK:
-        RUNNING[jid] = p
-    timer = threading.Timer(JOB_TIMEOUT, lambda: (update_job(jid, timeout=True), kill(p)))
+        RUNNING[key(jid)] = p
+    w = cur_ws()
+    timer = threading.Timer(JOB_TIMEOUT, lambda: (setattr(_REQ, "ws", w), update_job(jid, timeout=True), kill(p)))
     timer.start()
     tail, last = [], ""
     try:
@@ -601,7 +621,7 @@ def run_job(jid):
         timer.cancel()
         gpu_pick.release(g)
         with LOCK:
-            RUNNING.pop(jid, None)
+            RUNNING.pop(key(jid), None)
     elapsed = round(time.time() - t0, 1)
     job = load_job(jid)
     if job.get("cancel"):
@@ -641,7 +661,7 @@ def worker():
         with LOCK:
             while not QUEUE:
                 WAKE.wait()
-            jid = QUEUE.pop(0)
+            _REQ.ws, jid = QUEUE.pop(0)
         try:
             run_job(jid)
         except Exception as e:  # 작업 하나가 워커를 죽이지 않게
@@ -653,18 +673,22 @@ def worker():
 
 def recover():
     """서버 재시작 시: 돌던 작업은 실패 처리, 대기 작업은 다시 줄 세운다"""
-    d = os.path.join(WS, "jobs")
-    if not os.path.isdir(d):
-        return
-    for jid in sorted(os.listdir(d)):
-        try:
-            j = load_job(jid)
-        except (OSError, ValueError):
+    ud = os.path.join(WS, "u")
+    for w in [WS] + ([os.path.join(ud, n) for n in sorted(os.listdir(ud))] if os.path.isdir(ud) else []):
+        _REQ.ws = w
+        d = os.path.join(w, "jobs")
+        if not os.path.isdir(d):
             continue
-        if j.get("status") == "running":
-            update_job(jid, status="error", error="서버 재시작으로 중단됨 — 다시 실행하세요")
-        elif j.get("status") == "queued":
-            QUEUE.append(jid)
+        for jid in sorted(os.listdir(d)):
+            try:
+                j = load_job(jid)
+            except (OSError, ValueError):
+                continue
+            if j.get("status") == "running":
+                update_job(jid, status="error", error="서버 재시작으로 중단됨 — 다시 실행하세요")
+            elif j.get("status") == "queued":
+                QUEUE.append(key(jid))
+    _REQ.ws = WS
 
 
 # ── 결과 파싱 (stdlib 만: PDB, confidence JSON, npz) ──────────────────────
@@ -1201,7 +1225,7 @@ def models():
 def meta():
     return {"engines": engines(), "mpnn": mpnn_ok(), "max_aff_ligands": MAX_AFF_LIGANDS, "max_designs": MAX_DESIGNS, "modes": [{"id": k, **v} for k, v in MODES.items()], "max_res": MAX_RES,
             "max_chains": MAX_CHAINS, "max_samples": MAX_SAMPLES, "timeout": JOB_TIMEOUT, "examples": EXAMPLES,
-            "gpus": gpu_status(), "model": MODEL, "llm": LLM_BASE, "queue": len(QUEUE), "running": list(RUNNING)}
+            "gpus": gpu_status(), "model": MODEL, "llm": LLM_BASE, "queue": len(QUEUE), "running": [j for _, j in RUNNING]}
 
 
 # ── HTTP ────────────────────────────────────────────────────────────────
@@ -1245,6 +1269,7 @@ class H(BaseHTTPRequestHandler):
         self.wfile.write(b)
 
     def do_GET(self):
+        _REQ.ws = user_ws(self)
         u = urllib.parse.urlparse(self.path)
         path, q = u.path, urllib.parse.parse_qs(u.query)
         try:
@@ -1263,6 +1288,8 @@ class H(BaseHTTPRequestHandler):
             m = re.fullmatch(r"/api/job/([\w\-]+)(/[\w\-]+)?(/[\w.\-]+)?", path)
             if m:
                 jid, sub, arg = m.group(1), (m.group(2) or "")[1:], (m.group(3) or "")[1:]
+                if not os.path.exists(jdir(jid, "job.json")):  # 이 사용자 폴더에 없는 작업 (남의 id 포함)
+                    raise FileNotFoundError(jid)
                 if not sub:
                     return self._send(load_job(jid) | {"position": position(jid)})
                 if sub == "log":
@@ -1299,6 +1326,7 @@ class H(BaseHTTPRequestHandler):
             self._send({"error": f"{type(e).__name__}: {e}"}, code=500)
 
     def do_POST(self):
+        _REQ.ws = user_ws(self)
         try:
             req = json.loads(self.rfile.read(int(self.headers.get("Content-Length") or 0)) or b"{}")
             if self.path == "/api/validate":
@@ -1354,7 +1382,7 @@ def serve():
     eng = ",".join(e["id"] for e in engines()) or "없음"
     print(f"protein local → http://localhost:{PORT}  (engines={eng}, gpus={','.join(GPUS) or 'all'}, max_res={MAX_RES}, "
           f"llm={LLM_API} {LLM_BASE} {MODEL}, workspace={WS})  {_SIG}", flush=True)
-    ThreadingHTTPServer(("0.0.0.0", PORT), H).serve_forever()
+    ThreadingHTTPServer((os.environ.get("BIND", ""), PORT), H).serve_forever()
 
 
 if __name__ == "__main__":
