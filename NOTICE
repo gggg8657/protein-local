@@ -1,10 +1,16 @@
 protein-local
 =============
 
+이 저장소의 원저작물(코드·UI·프롬프트·문서·도구 설계)은 DongJu Kim(김동주, gggg8657)이 작성했다.
+제3자 구성요소는 각자의 라이선스를 따르며 THIRD_PARTY_NOTICES.md 에 적었다.
+제3자 구성요소의 권리는 이 저장소의 라이선스(MIT)로 바뀌지 않는다.
+연구·내부 시험용 프로토타입이며 배포·상업 서비스용이 아니다.
+
 Bundled third-party software:
   3Dmol.js 2.5.5 — static/3Dmol-min.js — Copyright (c) 2014, University of Pittsburgh and contributors
     BSD 3-Clause License (static/3Dmol.LICENSE.txt, static/3Dmol-min.js.LICENSE.txt)
     출처: https://github.com/3dmol/3Dmol.js (npm 3dmol@2.5.5). GLmol·Three.js·jQuery 코드 포함 — 각 라이선스는 위 파일에 기재.
+    번들 안의 pako(deflate/inflate, MIT) — licenses/pako.LICENSE.txt
 
 Used, not bundled (서버에 따로 설치되어 있어야 함):
   Boltz (boltz-1 / boltz-2) — MIT License — https://github.com/jwohlwend/boltz
@@ -17,14 +23,16 @@ Used, not bundled (서버에 따로 설치되어 있어야 함):
   RDKit (BSD-3-Clause), gemmi (MPL-2.0) — Boltz 환경에 함께 설치되는 의존성 (SMILES 확인, PDB→mmCIF 변환)
 
 예시 서열: Trp-cage TC5b(설계 펩타이드), 사람 유비퀴틴(UniProt P0CG48 의 1–76), 사람 인슐린 A·B 사슬(UniProt P01308),
-  Aequorea victoria GFP(UniProt P42212) — 공개 서열.
+  Aequorea victoria GFP(UniProt P42212) — 공개 서열. UniProt 데이터는 CC BY 4.0(출처: UniProt Consortium), PDB·CCD 는 CC0 1.0(wwPDB).
 
 예시 리간드: ATP·NAG(CCD 코드), 아스피린·에탄올·갈락토스(공개 SMILES).
 
-Files authored for this package (MIT): app.py, runner.py, runner_mpnn.py, ui.html, selftest.py, setup.sh, README.md
+Files authored for this package (MIT): app.py, runner.py, runner_mpnn.py, gpu_pick.py, ui.html, selftest.py, setup.sh, README.md
+
+ESM·AlphaFold·ColabFold 는 쓰지 않으며 MSA 서버도 부르지 않는다.
 
 LLM (not bundled): called via an OpenAI-compatible API; default deployment is Ollama (https://github.com/ollama/ollama, MIT)
-  serving Google Gemma (gemma4:31b, https://ai.google.dev/gemma — see Gemma's terms of use).
+  serving Google Gemma 4 (gemma4:31b, https://ai.google.dev/gemma, Apache-2.0).
 
-This package: Copyright (c) 2026 gggg8657 <dongjukim.dev@gmail.com>
+This package: Copyright (c) 2026 DongJu Kim (gggg8657) <gggg8657@gmail.com>
 화면 하단·메타데이터의 저작자 표기는 지우거나 바꾸지 마세요.

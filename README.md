@@ -2,6 +2,8 @@
 
 아미노산 서열(FASTA)을 넣으면 로컬 GPU 에서 Boltz-2 로 3D 구조(pLDDT·PAE)·결합 친화도를 예측하고, ProteinMPNN 으로 서열을 설계하는 로컬 웹 도구입니다. 포트 `8781`.
 
+> ⚠️ 연구·내부 시험용 프로토타입입니다(배포·상업 서비스용 아님). 제3자 구성요소의 라이선스는 THIRD_PARTY_NOTICES.md 를 확인하세요.
+
 ![구조 예측 결과 — 3D 뷰어 (pLDDT 색칠)](docs/img/result.png)
 
 ## 무엇을 하나
@@ -126,16 +128,21 @@ Boltz 가 내놓는 두 값의 뜻은 Boltz 공식 README 의 "Binding Affinity 
 
 ## 출처·감사 (Credits)
 
-- 동봉: [3Dmol.js](https://github.com/3dmol/3Dmol.js) 2.5.5 (BSD-3-Clause, `static/3Dmol.LICENSE.txt` — GLmol·Three.js·jQuery 포함)
-- [Boltz (Boltz-1 / Boltz-2)](https://github.com/jwohlwend/boltz) (MIT, 가중치 포함) — 구조·결합 친화도 예측. 서버에 따로 설치
-- [ProteinMPNN](https://github.com/dauparas/ProteinMPNN) / [LigandMPNN](https://github.com/dauparas/LigandMPNN) (MIT) — 서열 설계. 인용: Dauparas et al., *Science* (2022)
-- RDKit (BSD-3-Clause), gemmi (MPL-2.0) — Boltz 환경 의존성
-- 예시 서열은 공개 서열(UniProt P0CG48, P01308, P42212, Trp-cage TC5b), 예시 리간드는 CCD 코드·공개 SMILES
-- **LLM 실행** — OpenAI 호환 API 로 호출합니다(모델 가중치는 동봉하지 않음). 기본 배포는 [Ollama](https://github.com/ollama/ollama) (MIT) 위의 Google [Gemma](https://ai.google.dev/gemma) `gemma4:31b` — 모델 이용 조건은 Gemma 배포처 참고.
+- 동봉: [3Dmol.js](https://github.com/3dmol/3Dmol.js) 2.5.5 (BSD-3-Clause, `static/3Dmol.LICENSE.txt` — GLmol·Three.js·jQuery 포함, 번들 안 pako 는 MIT `licenses/pako.LICENSE.txt`)
+- [Boltz (Boltz-1 / Boltz-2)](https://github.com/jwohlwend/boltz) 2.2.1 (MIT, 코드·가중치 모두) — 구조·결합 친화도 예측. 서버에 따로 설치, 가중치는 저장소에 없음
+- [ProteinMPNN](https://github.com/dauparas/ProteinMPNN) / [LigandMPNN](https://github.com/dauparas/LigandMPNN) (MIT, 가중치 포함) — 서열 설계. 인용: Dauparas et al., *Science* (2022)
+- PyTorch (BSD-3), RDKit (BSD-3-Clause), gemmi (MPL-2.0) — Boltz·MPNN 환경 의존성
+- 예시 서열은 공개 서열(UniProt P0CG48, P01308, P42212 — CC BY 4.0, UniProt Consortium / PDB 1UBQ — CC0, Trp-cage TC5b), 예시 리간드는 CCD 코드(wwPDB, CC0)·공개 SMILES
+- ESM·AlphaFold·ColabFold 는 쓰지 않습니다(MSA 서버 호출도 없음).
+- **LLM 실행** — OpenAI 호환 API 로 호출합니다(모델 가중치는 동봉하지 않음). 기본 배포는 [Ollama](https://github.com/ollama/ollama) (MIT) 위의 Google [Gemma 4](https://ai.google.dev/gemma) `gemma4:31b` (Apache-2.0).
 - 이 도구는 [agent-page-portal](https://github.com/gggg8657/agent-page-portal) 에 연결해 쓰도록 만들었습니다(단독 실행도 됨).
 
-저작권 표기·전체 목록은 `NOTICE` 를 보세요.
+전체 목록·라이선스·상업 이용 확인 항목은 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md), 저작권 표기는 `NOTICE` 를 보세요.
 
 ## 라이선스
 
-MIT License — Copyright (c) 2026 DongJu Kim (gggg8657). `LICENSE` 를 보세요.
+MIT License — Copyright (c) 2026 DongJu Kim (gggg8657). `LICENSE` 를 보세요. 제3자 구성요소의 권리는 이 라이선스로 바뀌지 않습니다.
+
+## 만든 사람
+
+DongJu Kim (gggg8657) — 설계·구현
