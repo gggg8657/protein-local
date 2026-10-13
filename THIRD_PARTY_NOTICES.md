@@ -1,6 +1,6 @@
 # THIRD_PARTY_NOTICES — protein-local
 
-이 저장소의 코드(`app.py`·`runner.py`·`runner_mpnn.py`·`gpu_pick.py`·`ui.html`·`selftest.py`·`setup.sh`)는 DongJu Kim(gggg8657)이 작성했으며 MIT 입니다. 웹 서버는 Python 표준 라이브러리만 씁니다. 아래는 동봉했거나, 서버의 별도 conda 환경에 설치해 서브프로세스로 부르거나, 예시로 쓰는 제3자 구성요소입니다.
+이 저장소의 코드(`app.py`·`runner.py`·`runner_mpnn.py`·`gpu_pick.py`·`ui.html`·`selftest.py`·`setup.sh`)는 DongJu Kim(gggg8657)이 작성했으며 PolyForm Noncommercial 1.0.0 입니다. 웹 서버는 Python 표준 라이브러리만 씁니다. 아래는 동봉했거나, 서버의 별도 conda 환경에 설치해 서브프로세스로 부르거나, 예시로 쓰는 제3자 구성요소입니다.
 
 조사 기준: 2026-10-12. 실제 파일(import 문, `setup.sh`, `static/`)을 보고, 라이선스는 설치된 패키지의 dist-info LICENSE·메타데이터와 원 저장소에서 확인했습니다. 버전은 이 서버에 설치된 값입니다(고정 아님).
 

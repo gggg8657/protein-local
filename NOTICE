@@ -3,7 +3,7 @@ protein-local
 
 이 저장소의 원저작물(코드·UI·프롬프트·문서·도구 설계)은 DongJu Kim(김동주, gggg8657)이 작성했다.
 제3자 구성요소는 각자의 라이선스를 따르며 THIRD_PARTY_NOTICES.md 에 적었다.
-제3자 구성요소의 권리는 이 저장소의 라이선스(MIT)로 바뀌지 않는다.
+제3자 구성요소의 권리는 이 저장소의 라이선스(PolyForm Noncommercial 1.0.0)로 바뀌지 않는다.
 연구·내부 시험용 프로토타입이며 배포·상업 서비스용이 아니다.
 
 Bundled third-party software:
@@ -27,7 +27,7 @@ Used, not bundled (서버에 따로 설치되어 있어야 함):
 
 예시 리간드: ATP·NAG(CCD 코드), 아스피린·에탄올·갈락토스(공개 SMILES).
 
-Files authored for this package (MIT): app.py, runner.py, runner_mpnn.py, gpu_pick.py, ui.html, selftest.py, setup.sh, README.md
+Files authored for this package (PolyForm Noncommercial 1.0.0): app.py, runner.py, runner_mpnn.py, gpu_pick.py, ui.html, selftest.py, setup.sh, README.md
 
 ESM·AlphaFold·ColabFold 는 쓰지 않으며 MSA 서버도 부르지 않는다.
 
@@ -36,3 +36,15 @@ LLM (not bundled): called via an OpenAI-compatible API; default deployment is Ol
 
 This package: Copyright (c) 2026 DongJu Kim (gggg8657) <dongjukim.dev@gmail.com>
 화면 하단·메타데이터의 저작자 표기는 지우거나 바꾸지 마세요.
+
+License / 라이선스 (2026-10-13 변경: MIT → PolyForm Noncommercial 1.0.0)
+  이 저장소의 원저작물은 PolyForm Noncommercial License 1.0.0 을 따른다 (LICENSE, SPDX: PolyForm-Noncommercial-1.0.0,
+  https://polyformproject.org/licenses/noncommercial/1.0.0/).
+  비상업 목적(개인 연구·학습·시험, 교육기관·공공 연구기관·정부기관·비영리 단체 등)의 사용·수정·재배포는 허용하며,
+  상업적 이용은 저작자의 별도 허락이 필요하다.
+  이전 버전: 커밋 643deca 까지(2026-10-13 이전)의 버전을 MIT 로 받아 간 사본에는 MIT 가 계속 적용된다. 변경은 이후 버전에만 적용된다.
+  제3자 구성요소(동봉 파일·설치 의존성·모델·데이터)는 각자의 원래 라이선스를 그대로 따르며 이 변경의 영향을 받지 않는다
+  (THIRD_PARTY_NOTICES.md).
+  연구·내부 시험용 프로토타입이며 배포·상업 서비스용이 아니다.
+
+Required Notice: Copyright 2026 DongJu Kim (gggg8657)
