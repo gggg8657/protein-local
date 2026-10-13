@@ -441,6 +441,8 @@ def list_jobs(limit=200):
         except (OSError, ValueError):
             continue
         s = j.get("summary") or {}
+        if j.get("error"):
+            j["error"] = hide_paths(j["error"])
         out.append({k: j.get(k) for k in ("id", "kind", "title", "status", "created", "engine", "mode", "tokens", "error", "elapsed", "ref")}
                    | {"plddt": s.get("plddt"), "ptm": s.get("ptm"), "iptm": s.get("iptm"), "rmsd": s.get("rmsd"), "best": s.get("best"),
                       "n_chains": len(j.get("chains") or []), "n_ligands": len(j.get("ligands") or []), "position": position(jid)})
@@ -535,6 +537,7 @@ def submit_design(req):
 
 
 def cancel(jid):
+    load_job(jid)  # 이 사용자 폴더에 없는 작업이면 FileNotFoundError → 404
     with LOCK:
         if key(jid) in QUEUE:
             QUEUE.remove(key(jid))
@@ -559,6 +562,8 @@ def kill(p):
 
 
 def delete_job(jid):
+    if not os.path.exists(jdir(jid, "job.json")):  # 이 사용자 폴더에 없는 작업 (남의 id 포함)
+        raise FileNotFoundError(jid)
     with LOCK:
         if key(jid) in RUNNING:
             raise ValueError("실행 중인 작업은 먼저 취소하세요")
@@ -1061,7 +1066,8 @@ def validations(jid):
 
 
 def validate_designs(jid, req):
-    """설계 서열(+원서열) → 구조 예측 작업들 (원구조와 RMSD 비교)"""
+    """설계 서열(+원서열) → 구조 예측 작업들 (원구조와 RMSD 비교).
+    모든 요청을 먼저 검사하고 넣는다. 넣는 중에 실패하면 이미 넣은 작업을 대기열·폴더에서 지운다."""
     job = load_job(jid)
     res = json.loads(read(jdir(jid, "result.json")))
     by_i = {d["i"]: d["seq"] for d in res["designs"]}
@@ -1070,16 +1076,45 @@ def validate_designs(jid, req):
         picks = [0] + picks
     if not picks:
         raise ValueError("검증할 설계를 고르세요")
-    jobs = []
+    reqs = []
     for i in picks:
         seq = res["native"] if i == 0 else by_i.get(i)
         if not seq:
             continue
         fasta = "\n".join(f">{'native' if i == 0 else 'design' + str(i)}_{c}\n{s}" for c, s in zip(res["chain_ids"], seq.split(":")))
         title = f"{job['title'][:50]} — {'원서열' if i == 0 else '설계 ' + str(i)} 재예측"
-        jobs.append(submit({"fasta": fasta, "mode": req.get("mode") or "standard", "samples": 1, "title": title,
-                            "ref": {"job": jid, "design": i}}))
+        r = {"fasta": fasta, "mode": req.get("mode") or "standard", "samples": 1, "title": title, "ref": {"job": jid, "design": i}}
+        errors = validate(r)[1]
+        if errors:
+            raise ValueError(f"{'원서열' if i == 0 else '설계 ' + str(i)}: " + "\n".join(errors))
+        reqs.append(r)
+    jobs = []
+    try:
+        for r in reqs:
+            jobs.append(submit(r))
+    except BaseException:
+        for j in jobs:  # 반쯤 넣은 작업을 남기지 않는다
+            discard(j["id"])
+        raise
     return jobs
+
+
+def discard(jid):
+    """대기열에서 빼고(실행 중이면 끝내고) 폴더를 지운다"""
+    with LOCK:
+        queued = key(jid) in QUEUE
+        if queued:
+            QUEUE.remove(key(jid))
+        p = RUNNING.get(key(jid))
+    if p:
+        update_job(jid, cancel=True)
+        kill(p)
+        for _ in range(50):
+            with LOCK:
+                if key(jid) not in RUNNING:
+                    break
+            time.sleep(0.1)
+    shutil.rmtree(jdir(jid), ignore_errors=True)
 
 
 def zip_job(jid):
@@ -1225,7 +1260,16 @@ def models():
 def meta():
     return {"engines": engines(), "mpnn": mpnn_ok(), "max_aff_ligands": MAX_AFF_LIGANDS, "max_designs": MAX_DESIGNS, "modes": [{"id": k, **v} for k, v in MODES.items()], "max_res": MAX_RES,
             "max_chains": MAX_CHAINS, "max_samples": MAX_SAMPLES, "timeout": JOB_TIMEOUT, "examples": EXAMPLES,
-            "gpus": gpu_status(), "model": MODEL, "llm": LLM_BASE, "queue": len(QUEUE), "running": [j for _, j in RUNNING]}
+            "gpus": gpu_status(), "model": MODEL, "queue": len(QUEUE), "running_n": len(RUNNING),
+            "running": [j for w, j in RUNNING if w == cur_ws()]}  # 다른 사용자의 작업 id 는 안 줌(개수만)
+
+
+_ABS = re.compile(r"(?<![\w.])/(?:[\w.\-~+@]+/)+")
+
+
+def hide_paths(msg):
+    """응답 문구에 섞인 서버 폴더 경로를 지우고 파일 이름만 남긴다"""
+    return _ABS.sub("", str(msg))
 
 
 # ── HTTP ────────────────────────────────────────────────────────────────
@@ -1291,11 +1335,14 @@ class H(BaseHTTPRequestHandler):
                 if not os.path.exists(jdir(jid, "job.json")):  # 이 사용자 폴더에 없는 작업 (남의 id 포함)
                     raise FileNotFoundError(jid)
                 if not sub:
-                    return self._send(load_job(jid) | {"position": position(jid)})
+                    j = load_job(jid)
+                    if j.get("error"):
+                        j["error"] = hide_paths(j["error"])
+                    return self._send(j | {"position": position(jid)})
                 if sub == "log":
                     lines = read(jdir(jid, "log.txt")).splitlines() if os.path.exists(jdir(jid, "log.txt")) else []
                     since = int((q.get("since") or ["0"])[0])
-                    return self._send({"lines": lines[since:], "next": len(lines)})
+                    return self._send({"lines": [hide_paths(l) for l in lines[since:]], "next": len(lines)})
                 if sub == "result":
                     out = json.loads(read(jdir(jid, "result.json")))
                     if os.path.exists(jdir(jid, "explain.md")):
@@ -1323,7 +1370,7 @@ class H(BaseHTTPRequestHandler):
         except FileNotFoundError:
             self._send({"error": "없음"}, code=404)
         except Exception as e:
-            self._send({"error": f"{type(e).__name__}: {e}"}, code=500)
+            self._send({"error": hide_paths(f"{type(e).__name__}: {e}")}, code=500)
 
     def do_POST(self):
         _REQ.ws = user_ws(self)
@@ -1372,7 +1419,7 @@ class H(BaseHTTPRequestHandler):
         except FileNotFoundError:
             self._send({"error": "없음"}, code=404)
         except Exception as e:
-            self._send({"error": f"{type(e).__name__}: {e}"}, code=500)
+            self._send({"error": hide_paths(f"{type(e).__name__}: {e}")}, code=500)
 
 
 def serve():

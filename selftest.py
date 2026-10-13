@@ -332,6 +332,26 @@ def main():
     ok(len(vs) == 2 and all(v["status"] == "done" for v in vs), f"검증 완료 {vs}")
     ok(all(v["rmsd"] == 0.0 for v in vs), f"같은 좌표 → RMSD 0 {[v['rmsd'] for v in vs]}")
     ok(os.path.exists(app.jdir(jv[0]["id"], "models", "ref_aligned.pdb")), "겹친 원구조 저장")
+    # 넣는 도중 실패하면 앞서 넣은 작업이 대기열·폴더에 남지 않음
+    _sub, calls = app.submit, []
+    def _flaky(r):
+        if calls:
+            raise OSError("디스크 가득")
+        calls.append(1)
+        return _sub(r)
+    app.submit = _flaky
+    before = set(os.listdir(os.path.join(app.cur_ws(), "jobs")))
+    with app.LOCK:  # 워커가 먼저 집어 가지 않게 잠근 채로 넣고, 실패 정리까지 확인
+        try:
+            app.validate_designs(jd["id"], {"native": True, "designs": [d0["i"]], "mode": "fast"})
+            ok(False, "중간 실패가 올라오지 않음")
+        except OSError:
+            pass
+    app.submit = _sub
+    ok(set(os.listdir(os.path.join(app.cur_ws(), "jobs"))) == before and not [k for k in app.QUEUE if k[1] not in before],
+       "중간 실패 시 이미 넣은 검증 작업 정리")
+    m = app.meta()
+    ok("llm" not in m and "running_n" in m, "meta 에 LLM 주소 없음·실행 수만")
 
     # ── 겹침 수학 (회전·평행이동 복원) ──
     import random as _r

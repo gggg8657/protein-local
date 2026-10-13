@@ -344,7 +344,7 @@ async function drun() {
 function affRow() { const e = META.engines.find(x => x.id === $('#engine').value); $('#affrow').style.display = e && e.affinity ? '' : 'none'; }
 async function gpuLine() {
   try { const m = await api('api/meta'); META.gpus = m.gpus;
-    $('#gpu').textContent = (m.gpus.map(g => `GPU${g.index} 여유 ${(g.free / 1024).toFixed(0)}GB`).join(' · ') || 'GPU 정보 없음') + (m.queue ? ` · 대기 ${m.queue}건` : '') + (m.running.length ? ' · 실행 중 1건' : '');
+    $('#gpu').textContent = (m.gpus.map(g => `GPU${g.index} 여유 ${(g.free / 1024).toFixed(0)}GB`).join(' · ') || 'GPU 정보 없음') + (m.queue ? ` · 대기 ${m.queue}건` : '') + ((m.running_n ?? m.running.length) ? ` · 실행 중 ${m.running_n ?? m.running.length}건` : '');
   } catch (e) {}
 }
 function form() {
