@@ -14,6 +14,7 @@ header{padding:14px 20px;background:#0b2a4a;color:#fff;display:flex;align-items:
 header h1{font-size:18px;margin:0}
 header .sub{opacity:.75;font-size:13px}
 header .gpu{margin-left:auto;font-size:12px;opacity:.85}
+@media (min-width:601px){header{padding-right:56px}}  /* 포털 ? 사용법 버튼(오른쪽 위 고정) 자리 — 좁은 화면에선 버튼이 아래로 감 */
 main{display:grid;grid-template-columns:400px minmax(0,1fr);gap:16px;padding:16px;max-width:1600px;margin:0 auto}
 @media(max-width:1000px){main{grid-template-columns:minmax(0,1fr)}}
 main>*{min-width:0}
@@ -682,7 +683,8 @@ function focusRes(t) {
 
 // ── 그래프 ──
 function plddtChart() {
-  const cv = $('#plddt'), W = cv.parentElement.clientWidth - 32; cv.width = Math.max(300, W);
+  const cv = $('#plddt'); if (!cv) return;  // 다른 결과 화면(서열 설계 등)으로 넘어간 뒤 창 크기가 바뀌면 그래프가 없음
+  const W = cv.parentElement.clientWidth - 32; cv.width = Math.max(300, W);
   const g = cv.getContext('2d'), H = cv.height, L = 34, R = 8, T = 8, B = 22, n = TOKS.length, w = (cv.width - L - R) / n;
   g.clearRect(0, 0, cv.width, H); g.font = '11px sans-serif';
   [[90, 100, '#0053d6'], [70, 90, '#65cbf3'], [50, 70, '#ffdb13'], [0, 50, '#ff7d45']].forEach(([a, b, c]) => { g.fillStyle = c + '22'; g.fillRect(L, T + (100 - b) / 100 * (H - T - B), cv.width - L - R, (b - a) / 100 * (H - T - B)); });
@@ -730,7 +732,7 @@ async function explain() {
   finally { b.disabled = false; b.textContent = '다시 해설'; }
 }
 window.addEventListener('hashchange', () => { const h = location.hash.slice(1); if (h && h !== CUR) open(h); });
-window.addEventListener('resize', () => { if (TOKS) plddtChart(); });
+window.addEventListener('resize', () => { if (TOKS && $('#plddt')) plddtChart(); });
 function repaintTheme(n) {   // 테마를 바꾸면 뷰어 바탕·그래프 다시 칠하기 — 어둡게로 바꿀 땐 토큰 CSS 가 붙을 때까지 잠깐 기다림
   if (isDark() && !tok('--ag-surface', '') && n < 40) return setTimeout(() => repaintTheme(n + 1), 100);
   if (VIEW) { VIEW.setBackgroundColor(viewBg()); VIEW.render(); }
