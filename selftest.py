@@ -387,6 +387,38 @@ def main():
     app.delete_job(j3["id"])
     ok(not os.path.exists(app.jdir(j3["id"])), "작업 삭제")
 
+    # ── 포털 작업 알림 (PORTAL_JOBS_*): 없으면 조용히 False, 있으면 상태마다 POST ──
+    import http.server, portal_jobs
+    for k in ("PORTAL_JOBS_URL", "PORTAL_JOBS_TOKEN", "PORTAL_JOBS_TOOL"):
+        os.environ.pop(k, None)
+    ok(portal_jobs.notify("owner", "done", id="x") is False and app.notify_job(app.load_job(j1["id"])) is False, "알림 꺼짐 → False")
+    got = []
+    class P(http.server.BaseHTTPRequestHandler):
+        def log_message(self, *a):
+            pass
+        def do_POST(self):
+            got.append((self.headers.get("X-Portal-Jobs-Token"), json.loads(self.rfile.read(int(self.headers["Content-Length"])))))
+            self.send_response(200); self.send_header("Content-Length", "0"); self.end_headers()
+    ps = http.server.ThreadingHTTPServer(("127.0.0.1", 0), P)
+    threading.Thread(target=ps.serve_forever, daemon=True).start()
+    os.environ.update(PORTAL_JOBS_URL=f"http://127.0.0.1:{ps.server_address[1]}/api/internal/jobs", PORTAL_JOBS_TOKEN="tok", PORTAL_JOBS_TOOL="protein-local")
+    try:
+        jn = app.submit({"fasta": "MQIFVKTLTG", "title": "알림"})
+        with app.LOCK:  # 워커가 집어 가기 전에 취소
+            jc = app.submit({"fasta": "MQIFVKTLTG", "title": "취소"})
+            app.cancel(jc["id"])
+        wait(jn["id"])
+        ok(portal_jobs.flush(), "알림 다 보냄")
+    finally:
+        for k in ("PORTAL_JOBS_URL", "PORTAL_JOBS_TOKEN", "PORTAL_JOBS_TOOL"):
+            os.environ.pop(k, None)
+        ps.shutdown()
+    st = lambda jid: [p["status"] for t, p in got if p.get("id") == jid]
+    ok(st(jn["id"]) == ["queued", "running", "done"] and st(jc["id"]) == ["queued", "canceled"], f"알림 상태 순서 {got}")
+    p0 = next(p for t, p in got if p["id"] == jn["id"] and p["status"] == "done")
+    ok(all(t == "tok" for t, _ in got) and p0["tool"] == "protein-local" and p0["user"] == "owner" and p0["link"] == "/#" + jn["id"]
+       and p0["title"] == "구조 예측 — 알림" and p0["message"], f"알림 내용 {p0}")
+
 
 def array_of(n):
     return [float(i) for i in range(n * n)]

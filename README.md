@@ -45,6 +45,8 @@ python3 selftest.py           # GPU·모델 없이 검증 (가짜 엔진, 임시
 | `BIND` | (모든 인터페이스) | 포털이 `127.0.0.1` 을 줌 — 포털을 거쳐서만 접근 |
 
 포털 접속자 기준으로 작업(입력·결과·로그)은 사용자별로 따로 저장합니다(`WORKSPACE/u/<사용자>/`, 포털이 넘기는 `X-Agent-User` 헤더). 서버 주인(owner)·단독 실행은 예전처럼 `WORKSPACE` 바로 아래를 쓰므로 예전 기록이 그대로 보입니다. 포털이 `BIND=127.0.0.1` 을 주면 포털을 거쳐서만 열립니다. GPU 대기 줄은 모두가 같이 섭니다(순번·대기 건수만 공유).
+
+**포털 작업 알림** — 포털이 `PORTAL_JOBS_URL`·`PORTAL_JOBS_TOKEN`·`PORTAL_JOBS_TOOL` 을 넘기면 작업 상태(대기·실행·완료·실패·취소)를 포털 🔔 알림 센터로 보냅니다(`portal_jobs.py`, 없으면 아무 일도 안 함). 알림 링크는 `/#<작업 id>` — 화면이 그 작업 결과를 바로 엽니다.
 | `BOLTZ_ENV` | `~/miniforge3/envs/boltz` | boltz 패키지가 깔린 conda 환경 (그 `bin/python` 으로 `runner.py` 실행) |
 | `MPNN_ENV` | `~/miniforge3/envs/proteinmpnn` | `ligandmpnn`(가중치 포함) 이 깔린 conda 환경 — 서열 설계 탭 |
 | `BOLTZ_CACHE` | `~/.boltz` | `boltz2_conf.ckpt`, `boltz1_conf.ckpt`, `boltz2_aff.ckpt`, `mols/` (CCD) |

@@ -30,6 +30,7 @@ import zipfile
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import gpu_pick
+import portal_jobs
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 WS = os.environ.get("WORKSPACE") or os.path.join(ROOT, "_workspace")  # 포털이 AGENT_DATA/<도구> 로 모아 줌
@@ -86,6 +87,7 @@ def read(p):
 def user_ws(h):
     """포털이 넘긴 사용자별 작업 폴더. owner(서버 주인)·헤더 없음(단독 실행) = 예전 WORKSPACE 그대로"""
     u = (h.headers.get("X-Agent-User") or "owner").strip()
+    _REQ.user = u  # 포털 작업 알림 받을 사람 — 작업에 같이 적어 둠
     if u == "owner":
         return WS
     d = os.path.join(WS, "u", re.sub(r"[^A-Za-z0-9_.-]", "_", u)[:64] or "_")
@@ -470,11 +472,26 @@ def enqueue(job, params, files):
         save_job(job)
         QUEUE.append(key(job["id"]))
         WAKE.notify_all()
+    notify_job(job)
     return job
 
 
 def base_job(jid, kind, title, **kw):
-    return {"id": jid, "kind": kind, "title": title, "status": "queued", "created": datetime.datetime.now().isoformat(timespec="seconds"), **kw}
+    return {"id": jid, "kind": kind, "title": title, "status": "queued", "created": datetime.datetime.now().isoformat(timespec="seconds"),
+            "user": getattr(_REQ, "user", "owner"), **kw}
+
+
+def notify_job(job):
+    """포털 작업 알림(🔔) — PORTAL_JOBS_* 없으면 아무 일도 안 함(False). 예외·대기 없음. 링크 /#<id> 는 ui.html 이 열어 줌"""
+    try:
+        w = cur_ws()
+        user = job.get("user") or ("owner" if w == WS else os.path.basename(w))  # 예전 작업은 작업 폴더 이름으로
+        kind = {"design": "서열 설계", "affinity": "결합 친화도"}.get(job.get("kind"), "구조 예측")
+        msg = hide_paths(job.get("error") or "") or str((job.get("summary") or {}).get("best") or "")
+        return portal_jobs.notify(user, {"error": "failed"}.get(job.get("status"), job.get("status")), id=job["id"],
+                                  title=f"{kind} — {job.get('title') or ''}", link="/#" + job["id"], message=msg)
+    except Exception:
+        return False
 
 
 def seed_of(spec):
@@ -541,7 +558,9 @@ def cancel(jid):
     with LOCK:
         if key(jid) in QUEUE:
             QUEUE.remove(key(jid))
-            return update_job(jid, status="canceled", error="사용자가 취소함")
+            job = update_job(jid, status="canceled", error="사용자가 취소함")
+            notify_job(job)
+            return job
         p = RUNNING.get(key(jid))
     if p:
         update_job(jid, cancel=True)
@@ -579,6 +598,7 @@ NOISE = re.compile(r"tensorboardX|Lightning v|Tensor Cores|set_float32_matmul|wa
 
 def run_job(jid):
     job = update_job(jid, status="running", started=datetime.datetime.now().isoformat(timespec="seconds"))
+    notify_job(job)
     log = open(jdir(jid, "log.txt"), "a", encoding="utf-8", buffering=1)
     env = gpu_pick.pool_env(dict(os.environ, PYTHONUNBUFFERED="1", HF_HUB_OFFLINE="1", TQDM_MININTERVAL="2"))  # GPU 못 고르면 후보 안으로만(예약 GPU 안 보임)
     g = pick_gpu(need_mb(job))
@@ -668,10 +688,10 @@ def worker():
                 WAKE.wait()
             _REQ.ws, jid = QUEUE.pop(0)
         try:
-            run_job(jid)
+            notify_job(run_job(jid))  # 끝난 상태(done·error·canceled) 알림
         except Exception as e:  # 작업 하나가 워커를 죽이지 않게
             try:
-                update_job(jid, status="error", error=f"{type(e).__name__}: {e}")
+                notify_job(update_job(jid, status="error", error=f"{type(e).__name__}: {e}"))
             except Exception:
                 pass
 
@@ -690,7 +710,7 @@ def recover():
             except (OSError, ValueError):
                 continue
             if j.get("status") == "running":
-                update_job(jid, status="error", error="서버 재시작으로 중단됨 — 다시 실행하세요")
+                notify_job(update_job(jid, status="error", error="서버 재시작으로 중단됨 — 다시 실행하세요"))
             elif j.get("status") == "queued":
                 QUEUE.append(key(jid))
     _REQ.ws = WS
