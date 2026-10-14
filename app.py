@@ -1449,7 +1449,7 @@ def serve():
     eng = ",".join(e["id"] for e in engines()) or "없음"
     print(f"protein local → http://localhost:{PORT}  (engines={eng}, gpus={','.join(GPUS) or 'all'}, max_res={MAX_RES}, "
           f"llm={LLM_API} {LLM_BASE} {MODEL}, workspace={WS})  {_SIG}", flush=True)
-    ThreadingHTTPServer((os.environ.get("BIND", ""), PORT), H).serve_forever()
+    ThreadingHTTPServer((os.environ.get("BIND", "127.0.0.1"), PORT), __import__("portal_auth").install(H, "protein-local")).serve_forever()
 
 
 if __name__ == "__main__":
