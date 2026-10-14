@@ -580,7 +580,7 @@ NOISE = re.compile(r"tensorboardX|Lightning v|Tensor Cores|set_float32_matmul|wa
 def run_job(jid):
     job = update_job(jid, status="running", started=datetime.datetime.now().isoformat(timespec="seconds"))
     log = open(jdir(jid, "log.txt"), "a", encoding="utf-8", buffering=1)
-    env = dict(os.environ, PYTHONUNBUFFERED="1", CUDA_DEVICE_ORDER="PCI_BUS_ID", HF_HUB_OFFLINE="1", TQDM_MININTERVAL="2")
+    env = gpu_pick.pool_env(dict(os.environ, PYTHONUNBUFFERED="1", HF_HUB_OFFLINE="1", TQDM_MININTERVAL="2"))  # GPU 못 고르면 후보 안으로만(예약 GPU 안 보임)
     g = pick_gpu(need_mb(job))
     if g:
         env["CUDA_VISIBLE_DEVICES"] = g["index"]
