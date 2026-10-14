@@ -12,6 +12,8 @@ import tempfile
 import threading
 import time
 import urllib.request
+for _k in ("PORTAL_JOBS_URL", "PORTAL_JOBS_TOKEN", "PORTAL_JOBS_TOOL"):   # setup.sh 가 포털 환경에서 돌려도 시험 작업을 진짜 🔔 로 보내지 않게
+    os.environ.pop(_k, None)
 import zipfile
 
 TMP = tempfile.mkdtemp(prefix="protein-selftest-")
