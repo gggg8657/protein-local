@@ -28,6 +28,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import portal_auth  # 포털 서명 확인 관문·오류 문장 정리(원본 agent-page-portal/sdk/portal_auth.py)
 
 import gpu_pick
 import portal_jobs
@@ -1449,7 +1450,7 @@ def serve():
     eng = ",".join(e["id"] for e in engines()) or "없음"
     print(f"protein local → http://localhost:{PORT}  (engines={eng}, gpus={','.join(GPUS) or 'all'}, max_res={MAX_RES}, "
           f"llm={LLM_API} {LLM_BASE} {MODEL}, workspace={WS})  {_SIG}", flush=True)
-    ThreadingHTTPServer((os.environ.get("BIND", "127.0.0.1"), PORT), __import__("portal_auth").install(H, "protein-local")).serve_forever()
+    ThreadingHTTPServer((os.environ.get("BIND", "127.0.0.1"), PORT), portal_auth.install(H, "protein-local")).serve_forever()
 
 
 if __name__ == "__main__":
